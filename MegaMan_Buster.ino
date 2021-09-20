@@ -10,6 +10,7 @@ int ringArray[] = {0,32,56,72,84,93};
 
 
 int buttonState = 0;
+int btnPress = 0;
 
 //Initial color selection
 int r = 60;
@@ -66,23 +67,27 @@ void loop() {
   
   buttonState = digitalRead(BUTTON_PIN);
   currentMillis = millis();
+  //Current Pressing button
   if (buttonState == HIGH && animate != 1) {
     Serial.println("Clicked!");
-
-    animate = 1;
-    animationMillis = currentMillis;
-    
-    setLedBlue();
-    
-  }
-
-  //Reset after charge animation (1) or cooldown (5) animation
-  if(currentMillis - animationMillis > animationInterval && animate == 1) {
+    //If you've just clicked the button (first frame)
+    if(btnPress == 0) {   
+      setLedBlue(); 
+    }
+    btnPress++;
+    Serial.println(btnPress);
+    animate = 1;  
+  } else if(buttonState == LOW && btnPress > 0) { //Released Button
+    btnPress = 0;
+    fireBright = 200;
     animate = 4; //Send to fire!
     loopInterval = 100;
     FastLED.clear();
     FastLED.show();
-  } else if (currentMillis - animationMillis > animationInterval && animate == 5) {
+  }
+
+  //Reset after charge animation (1) or cooldown (5) animation
+  if (currentMillis - animationMillis > animationInterval && animate == 5) {
     animate = 3; //Send to warm up
     FastLED.clear();
     FastLED.show();
