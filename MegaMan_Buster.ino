@@ -1,4 +1,17 @@
 #include "FastLED.h"
+#include "DFPlayerMini_Fast.h"
+
+#if !defined(UBRR1H)
+  #include "SoftwareSerial.h"
+  SoftwareSerial mySerial(10, 11); // RX, TX
+#endif
+
+//Sounds
+// 1 = Charging
+// 2 = Charged
+// 3 = Charged Shot
+// 4 = Non-Charged Shot
+DFPlayerMini_Fast myMP3;
 
 #define NUM_LEDS 93
 #define DATA_PIN 3
@@ -40,12 +53,13 @@ int fireBright = 200;
 int loopInterval = 100;
 int animationInterval = 5000;
 
-
 //Animation to run
 // 0 = none
 // 1 = charging
 // 2 = idle pulse
 // 3 = warm up
+// 4 = fire
+// 5 = cooldown
 int animate = 3;
 
 // Define the array of leds
@@ -60,6 +74,17 @@ void setup() {
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   FastLED.show();
+
+  #if !defined(UBRR1H)
+    mySerial.begin(9600);
+    myMP3.begin(mySerial, true);
+  #else
+    Serial1.begin(9600);
+    myMP3.begin(Serial1, true);
+  #endif
+  Serial.println("Setting volume to max");
+  myMP3.volume(15);
+  myMP3.play(2);
   Serial.println("Setup Complete");
 }
 
@@ -68,19 +93,33 @@ void loop() {
   buttonState = digitalRead(BUTTON_PIN);
   currentMillis = millis();
   //Current Pressing button
-  if (buttonState == HIGH && animate != 1) {
-    Serial.println("Clicked!");
+  if (buttonState == HIGH) {
     //If you've just clicked the button (first frame)
     if(btnPress == 0) {   
       setLedBlue(); 
+      
+      Serial.println("Play Charging");
+      myMP3.play(1);  
+      animate = 1;
     }
-    btnPress++;
-    Serial.println(btnPress);
-    animate = 1;  
+    if(btnPress < 1000) {
+      btnPress++;
+    } 
   } else if(buttonState == LOW && btnPress > 0) { //Released Button
+
+    if(btnPress == 1000) {
+      
+      Serial.println("Play Fully Charged shot");
+      myMP3.play(3); 
+    } else {
+      
+      Serial.println("Play Partial Charged shot");
+      myMP3.play(4);
+    }
     btnPress = 0;
     fireBright = 200;
     animate = 4; //Send to fire!
+    
     loopInterval = 100;
     FastLED.clear();
     FastLED.show();
@@ -94,7 +133,7 @@ void loop() {
   }
 
   //Charge Animation
-  if(animate == 1 && currentMillis - prevMillis > loopInterval) {    
+  if(animate == 1 && currentMillis - prevMillis > loopInterval/2) {    
     LightRing(rowCount);
   }
 
@@ -190,9 +229,7 @@ void LightRing(int row) {
 }
 
 void PulseRing(int bright, int startRow = -1, int endRow = -1, int pulseColor = 0) {
-  Serial.print("Pulsing to brightness ");
-  Serial.println(bright);
-  
+   
   prevMillis = currentMillis;
   FastLED.clear();
   //Affect the entire array
