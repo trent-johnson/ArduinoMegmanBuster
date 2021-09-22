@@ -17,13 +17,15 @@ DFPlayerMini_Fast myMP3;
 #define DATA_PIN 3
 #define CLOCK_PIN 13
 #define BUTTON_PIN 9
+#define MUSIC_PIN 7
 
 //The boundaries of the various LED rings
 int ringArray[] = {0,32,56,72,84,93};
 
-
+int musicState = 0;
 int buttonState = 0;
 int btnPress = 0;
+int musicPress = 0;
 
 //Initial color selection
 int r = 60;
@@ -34,6 +36,7 @@ int b = 252;
 unsigned long prevMillis = 0;
 unsigned long currentMillis = 0;
 unsigned long animationMillis = 0;
+unsigned long chargeMillis = 0;
 
 //Animation helpers
 int rowCount = 0;
@@ -62,6 +65,25 @@ int animationInterval = 5000;
 // 5 = cooldown
 int animate = 3;
 
+//Music
+// 1 = Charging
+// 2 = Zero Theme
+// 3 = Full Charge shot
+// 4 = Half Charge shot
+// 5 = Armadelo Stage
+// 6 = Boomer Stage
+// 7 = Bridge Stage
+// 8 = Chill Stage
+// 9 = Flame Stage
+// 10 = Spark Stage
+// 11 = Sting Stage
+// 12 = Storm Stage
+// 13 = Octo Stage 
+// 14 = Final Stage
+// 15 = Intro
+
+int musicArray[] = {2,5,6,7,8,9,10,11,12,13,14};
+
 // Define the array of leds
 CRGB leds[NUM_LEDS];
 
@@ -71,44 +93,57 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Setup Started");
   pinMode(BUTTON_PIN, INPUT);
+  pinMode(MUSIC_PIN, INPUT);
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   FastLED.show();
 
-  #if !defined(UBRR1H)
-    mySerial.begin(9600);
-    myMP3.begin(mySerial, true);
-  #else
-    Serial1.begin(9600);
-    myMP3.begin(Serial1, true);
-  #endif
-  Serial.println("Setting volume to max");
-  myMP3.volume(15);
-  myMP3.play(2);
+  mySerial.begin(9600);
+
+
+  
+  if(!myMP3.begin(mySerial, true)) {
+    Serial.println("DFMini Not Intialized.");
+    while(true);
+  }
+  
+  myMP3.volume(29);
+  delay(2000);
+  myMP3.play(15);
   Serial.println("Setup Complete");
 }
 
 void loop() { 
   
   buttonState = digitalRead(BUTTON_PIN);
+  musicState = digitalRead(MUSIC_PIN);
   currentMillis = millis();
-  //Current Pressing button
+
+  //Pressing Music Button
+  if (musicState == HIGH)
+  {
+    if(musicPress == 0) {
+      myMP3.play(musicArray[random(0,10)]);
+    }
+    musicPress = 1;
+  } else if (musicState == LOW && musicPress > 0) {
+    musicPress = 0;
+  }
+  
+  //Current Pressing Fire button
   if (buttonState == HIGH) {
     //If you've just clicked the button (first frame)
     if(btnPress == 0) {   
       setLedBlue(); 
-      
+      chargeMillis = currentMillis;
       Serial.println("Play Charging");
       myMP3.play(1);  
       animate = 1;
     }
-    if(btnPress < 1000) {
-      btnPress++;
-    } 
+    btnPress = 1;
   } else if(buttonState == LOW && btnPress > 0) { //Released Button
 
-    if(btnPress == 1000) {
-      
+    if(currentMillis - chargeMillis > 2500) {
       Serial.println("Play Fully Charged shot");
       myMP3.play(3); 
     } else {
