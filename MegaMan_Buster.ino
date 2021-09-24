@@ -6,11 +6,7 @@
   SoftwareSerial mySerial(10, 11); // RX, TX
 #endif
 
-//Sounds
-// 1 = Charging
-// 2 = Charged
-// 3 = Charged Shot
-// 4 = Non-Charged Shot
+
 DFPlayerMini_Fast myMP3;
 
 #define NUM_LEDS 93
@@ -81,6 +77,7 @@ int animate = 3;
 // 13 = Octo Stage 
 // 14 = Final Stage
 // 15 = Intro
+// 16 = Basic Buster
 
 int musicArray[] = {2,5,6,7,8,9,10,11,12,13,14};
 
@@ -134,20 +131,20 @@ void loop() {
   if (buttonState == HIGH) {
     //If you've just clicked the button (first frame)
     if(btnPress == 0) {   
-      setLedBlue(); 
       chargeMillis = currentMillis;
+      setLedBlue(); 
       Serial.println("Play Charging");
       myMP3.play(1);  
       animate = 1;
     }
     btnPress = 1;
-  } else if(buttonState == LOW && btnPress > 0) { //Released Button
+  } 
+  else if(buttonState == LOW && btnPress > 0) { //Released Button
 
     if(currentMillis - chargeMillis > 2500) {
       Serial.println("Play Fully Charged shot");
       myMP3.play(3); 
     } else {
-      
       Serial.println("Play Partial Charged shot");
       myMP3.play(4);
     }
@@ -271,7 +268,7 @@ void PulseRing(int bright, int startRow = -1, int endRow = -1, int pulseColor = 
   if(startRow == -1) {
     for(int led = ringArray[0]; led < ringArray[5]; led++) {
       if(pulseColor == 0) {
-        leds[led].setRGB(bright, bright / 1.5, 0);
+        leds[led].setRGB(bright, bright / 4, 0);
       } else if(pulseColor == 1) {
         leds[led].setRGB(bright, 0, 0);
       }
@@ -279,9 +276,10 @@ void PulseRing(int bright, int startRow = -1, int endRow = -1, int pulseColor = 
   } else {    
     for(int led = ringArray[startRow]; led < ringArray[endRow]; led++) { 
       if(pulseColor == 0) {
-        leds[led].setRGB(bright, bright / 1.5, 0);
+        leds[led].setRGB(bright, bright / 4, 0);
       } else if(pulseColor == 1) {
-        leds[led].setRGB(bright, 0, 0);
+        leds[led].setRGB(bright, 0, 0);.
+        
       }
     }
   }
