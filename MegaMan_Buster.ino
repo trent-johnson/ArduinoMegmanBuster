@@ -18,6 +18,17 @@ DFPlayerMini_Fast myMP3;
 //The boundaries of the various LED rings
 int ringArray[] = {0,32,56,72,84,93};
 
+//Settings
+int volume = 29;
+int brightness = 100;
+int menu = 0; // 0 = volume, 1 = brightness
+
+//Buster Modes 
+// 1 = normal
+// 2 = settings
+int busterMode = 1;
+
+//Button States
 int musicState = 0;
 int buttonState = 0;
 int btnPress = 0;
@@ -33,6 +44,10 @@ unsigned long prevMillis = 0;
 unsigned long currentMillis = 0;
 unsigned long animationMillis = 0;
 unsigned long chargeMillis = 0;
+unsigned long musicMillis = 0;
+
+int loopInterval = 100;
+int animationInterval = 5000;
 
 //Animation helpers
 int rowCount = 0;
@@ -49,8 +64,6 @@ bool pulseInc = false;
 int warmBright = 2;
 int fireBright = 200;
 
-int loopInterval = 100;
-int animationInterval = 5000;
 
 //Animation to run
 // 0 = none
@@ -91,9 +104,12 @@ void setup() {
   Serial.println("Setup Started");
   pinMode(BUTTON_PIN, INPUT);
   pinMode(MUSIC_PIN, INPUT);
+  
+  Serial.println("Buttons Added");
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
-  FastLED.show();
+  
+  Serial.println("LEDs added");
 
   mySerial.begin(9600);
 
@@ -104,9 +120,17 @@ void setup() {
     while(true);
   }
   
-  myMP3.volume(29);
+  Serial.println("DFplayer Added");
+  myMP3.volume(volume);
+  
+  Serial.println("Set volume");
   delay(2000);
   myMP3.play(15);
+  
+  Serial.println("Playing intro");
+
+
+  FastLED.show();
   Serial.println("Setup Complete");
 }
 
@@ -116,51 +140,147 @@ void loop() {
   musicState = digitalRead(MUSIC_PIN);
   currentMillis = millis();
 
-  //Pressing Music Button
-  if (musicState == HIGH)
-  {
-    if(musicPress == 0) {
-      myMP3.play(musicArray[random(0,10)]);
+  //Button actions in settings mode
+  if(busterMode == 2) {
+    
+    //Decrease button (music)
+    if (musicState == HIGH)
+    {
+      if(musicPress == 0) {
+        musicMillis = currentMillis;
+      }
+      musicPress = 1;
+    } else if (musicState == LOW && musicPress > 0 && currentMillis - musicMillis < 2000) {
+      if(menu == 0) {
+        //When released decrease volume     
+        myMP3.decVolume();                
+        Serial.println("Decrease volume");
+      } else if (menu == 1) {
+        //When released decrease volume      
+        if(brightness <= 0) {
+          brightness = 0;
+        } else {
+          brightness = brightness - 10;
+        }
+        Serial.println("Decrease brightness to");
+        Serial.println(brightness); 
+        animate = 2;
+        FastLED.show();
+      }
+      myMP3.play(3); //Half Charge confirmation
+      musicPress = 0;
+    } else  if (musicState == LOW && musicPress > 0) {
+      //Button was held longer then 2 seconds - Enter normal mode
+      Serial.println("Entering normal mode");
+      busterMode = 1;
+      musicPress = 0;
+      FastLED.clear();
+      FastLED.show();
+      myMP3.play(16); //Confirmation noise - basic buster
+      animate = 3;
     }
-    musicPress = 1;
-  } else if (musicState == LOW && musicPress > 0) {
-    musicPress = 0;
+
+    //Increase button (Charge)
+    if (buttonState == HIGH) {
+      //If you've just clicked the button (first frame)
+      if(btnPress == 0) {   
+        chargeMillis = currentMillis;
+      }
+      btnPress = 1;
+    } 
+    else if(buttonState == LOW && btnPress > 0 && currentMillis - chargeMillis < 2000) { //Released Button
+      if(menu == 0) {
+        //When released decrease volume      
+        
+        myMP3.incVolume();
+        Serial.println("Increase volume");
+      } else if (menu == 1) {
+        //When released decrease volume      
+        if(brightness >= 100) {
+          brightness = 100;
+        } else {
+          brightness = brightness + 10;
+        }
+        Serial.println("Increase brightness to");
+        Serial.println(brightness); 
+        animate = 2;
+        FastLED.show();
+      }
+      btnPress = 0;
+      myMP3.play(3);  //Half Charge confirmation
+    } else if(buttonState == LOW && btnPress > 0 ) {
+      //change menu
+      if(menu == 0) {
+        menu = 1;
+      } else {
+        menu = 0;
+      }
+      
+      btnPress = 0;
+      myMP3.play(4);  //Fully Chage shot confirmation
+    }
+  }
+
+
+  //Button actions if in normal mode
+  if(busterMode == 1) {
+    
+    //Pressing Music Button
+    if (musicState == HIGH)
+    {
+      if(musicPress == 0) {
+        musicMillis = currentMillis;
+      }
+      musicPress = 1;
+    } else if (musicState == LOW && musicPress > 0 && currentMillis - musicMillis < 2000) {
+      //When released      
+      myMP3.play(musicArray[random(0,10)]);
+      musicPress = 0;
+    } else if (musicState == LOW && musicPress > 0) {
+      //Button was held longer then 2 seconds - Enter settings mode
+      Serial.println("Entering settings mode");
+      busterMode = 2;
+      musicPress = 0;
+      FastLED.clear();
+      FastLED.show();
+      myMP3.play(16); //Confirmation noise - basic buster
+    }
+    
+    //Current Pressing Fire button
+    if (buttonState == HIGH) {
+      //If you've just clicked the button (first frame)
+      if(btnPress == 0) {   
+        chargeMillis = currentMillis;
+        setLedBlue(); 
+        Serial.println("Play Charging");
+        myMP3.play(1);  
+        animate = 1;
+      }
+      btnPress = 1;
+    } 
+    else if(buttonState == LOW && btnPress > 0) { //Released Button
+  
+      if(currentMillis - chargeMillis > 2500) {
+        Serial.println("Play Fully Charged shot");
+        myMP3.play(3); 
+      } else {
+        Serial.println("Play Partial Charged shot");
+        myMP3.play(4);
+      }
+      btnPress = 0;
+      fireBright = 200;
+      animate = 4; //Send to fire!
+      
+      loopInterval = 100;
+      ClearRing();
+      FastLED.show();
+    }
   }
   
-  //Current Pressing Fire button
-  if (buttonState == HIGH) {
-    //If you've just clicked the button (first frame)
-    if(btnPress == 0) {   
-      chargeMillis = currentMillis;
-      setLedBlue(); 
-      Serial.println("Play Charging");
-      myMP3.play(1);  
-      animate = 1;
-    }
-    btnPress = 1;
-  } 
-  else if(buttonState == LOW && btnPress > 0) { //Released Button
-
-    if(currentMillis - chargeMillis > 2500) {
-      Serial.println("Play Fully Charged shot");
-      myMP3.play(3); 
-    } else {
-      Serial.println("Play Partial Charged shot");
-      myMP3.play(4);
-    }
-    btnPress = 0;
-    fireBright = 200;
-    animate = 4; //Send to fire!
-    
-    loopInterval = 100;
-    FastLED.clear();
-    FastLED.show();
-  }
-
   //Reset after charge animation (1) or cooldown (5) animation
   if (currentMillis - animationMillis > animationInterval && animate == 5) {
     animate = 3; //Send to warm up
-    FastLED.clear();
+    ClearRing();
     FastLED.show();
   }
 
@@ -240,7 +360,7 @@ void loop() {
 }
 
 void LightRing(int row) {
-    FastLED.clear();
+    ClearRing();
     for(int led = ringArray[row]; led < ringArray[row+1]; led++) { 
         leds[led].setRGB( r, g, b); 
     }
@@ -263,22 +383,22 @@ void LightRing(int row) {
 void PulseRing(int bright, int startRow = -1, int endRow = -1, int pulseColor = 0) {
    
   prevMillis = currentMillis;
-  FastLED.clear();
+  ClearRing();
   //Affect the entire array
   if(startRow == -1) {
     for(int led = ringArray[0]; led < ringArray[5]; led++) {
       if(pulseColor == 0) {
-        leds[led].setRGB(bright, bright / 4, 0);
+        leds[led].setRGB((int) bright * (brightness * 0.01), (int) (bright / 4) * (brightness * 0.01), 0);
       } else if(pulseColor == 1) {
-        leds[led].setRGB(bright, 0, 0);
+        leds[led].setRGB((int) bright * (brightness * 0.01), 0, 0);
       }
     }
   } else {    
     for(int led = ringArray[startRow]; led < ringArray[endRow]; led++) { 
       if(pulseColor == 0) {
-        leds[led].setRGB(bright, bright / 4, 0);
+        leds[led].setRGB((int) bright * (brightness * 0.01), (int) (bright / 4) * (brightness * 0.01), 0);
       } else if(pulseColor == 1) {
-        leds[led].setRGB(bright, 0, 0);.
+        leds[led].setRGB((int) bright * (brightness * 0.01), 0, 0);
         
       }
     }
@@ -286,13 +406,19 @@ void PulseRing(int bright, int startRow = -1, int endRow = -1, int pulseColor = 
   FastLED.show();
 }
 
+void ClearRing() {
+  for(int led = ringArray[0]; led < ringArray[5]; led++) {
+    leds[led].setRGB(0,0,0);
+  }
+}
+
 void setLedBlue() {
-    r = 60;
-    g = 188;
-    b = 252;
+    r = (int) 60 * (brightness * 0.01);
+    g = (int) 188 * (brightness * 0.01);
+    b = (int) 252 * (brightness * 0.01);
 }
 void setLedYellow() {
-    r = 251;
-    g = 219;
-    b = 60;
+    r = (int) 251 * (brightness * 0.01);
+    g = (int) 219 * (brightness * 0.01);
+    b = (int) 60 * (brightness * 0.01);
 }
